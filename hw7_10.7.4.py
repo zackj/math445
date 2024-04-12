@@ -75,6 +75,13 @@ def partD():
         testVal = powerUpModulo(a, x, p)
         assert (b == testVal)
 
+print("ZACK JARRETT")
+print("MATH 445, Spring 2024, University of Arizona")
+print("Homework 7, Computer Problem 10.7.4")
+print("Code available at:")
+print("https://github.com/zackj/math445/blob/main/hw7_10.7.4.py")
+print("https://github.com/zackj/math445/blob/main/cryptoUtils.py")
+print("")
 
 partA()
 print("")

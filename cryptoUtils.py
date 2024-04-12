@@ -359,10 +359,10 @@ def testPohligHellman():
     print(f"Pohlig-Hellman Solution for {a}^x ≡ {b} mod {p} is {x}")
     print(f"{a}^{x} % {p} = {b}")
 
-
-test_crt()
-testGeneratorListAndInverse()
-testPohligHellman()
+def test():
+    test_crt()
+    testGeneratorListAndInverse()
+    testPohligHellman()
 
 
 def testBabyGiant():
