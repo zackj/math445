@@ -451,7 +451,7 @@ def test_PohligHellman():
 #
 #  So the curve is really defined by the parameters b, c, and q
 #  q should be prime
-def ell_curve_add_points(b: int, c: int, q: int, p1: Ell_Pt, p2: Ell_Pt):
+def ell_add_points(b: int, c: int, q: int, p1: Ell_Pt, p2: Ell_Pt):
     # Handle adding infinity:
     if (p1.isInf):
         return p2
@@ -466,7 +466,7 @@ def ell_curve_add_points(b: int, c: int, q: int, p1: Ell_Pt, p2: Ell_Pt):
     # Determine m
     # Recall there are two possibilities:
     if (p1 == p2):
-        # Special Case for y=0, which would mean 
+        # Special Case for y=0, which would mean
         # 0 in the denominator for m.
         if y1 == 0:
             return Ell_Pt(isInf=True)
@@ -498,6 +498,73 @@ def ell_curve_add_points(b: int, c: int, q: int, p1: Ell_Pt, p2: Ell_Pt):
     return Ell_Pt(x=x3, y=y3)
 
 
+def ell_size_of_E_by_hasse(b: int, c: int, q: int, p: Ell_Pt, k: int) -> int:
+    # Use Hasse's theorem to determine the size of E
+    #
+    # INPUTS:
+    # b and c describe the curve as y^2 ≡ x^3 + b*x + c mod q
+    # p is a point on the curve whose order we know
+    # k is the order of p
+    #
+    # Let n = #E, then we know by Hasse that:
+    # | n - q - 1 | < 2 * sqrt(q)
+    #
+    # Since n is a magnitude of a discrete group,
+    # we know it is a positive integer.
+    #
+    # We know by exercise 19.d that #E is a multiple of k.
+    #
+    # First, establish the bounds on n based on the inequality
+    f = floor(2*sqrt(q))
+    q1 = q-1
+    upper_bound = f+q1
+    lower_bound = -1*(f-q1)
+    
+    print(f"Hasse's Theorem Solver for the curve E: y^2 ≡ x^3 + {b}x + {c} mod {q}")
+    print(f"Order of point {p} is {k}")
+    print(f"Let n := #E, then by Hasse's Theorem:")
+    print(f"{lower_bound} < n < {upper_bound}")
+    print(f"We know #E ≡ 0 mod k. We will now find it:")
+    
+    lowest_k = floor(lower_bound/k)
+    highest_k = ceil(upper_bound/k)
+    l = -1
+    for i in range(lowest_k, highest_k):
+        l = i*k
+        if (l > lower_bound and l < upper_bound):
+            print(f"#E is {l}")
+            break
+    
+    if (l == -1):
+        print("Hasse's Solver failed! Run for your lives!")
+    return l 
+
+
+def test_ell_size_of_E_by_hasse():
+    l = ell_size_of_E_by_hasse(2, 3, 19, Ell_Pt(x=1, y=5), 20)
+    assert(l == 20)
+
+def ell_check_point(b: int, c: int, q: int, p: Ell_Pt) -> bool:
+    # Check that a given point is on the curve
+    if (p.isInf == True):
+        # ∞ is on every curve
+        result = True
+    else:
+        lhs = (p.y ** 2) % q
+        rhs = ((p.x ** 3) + b*p.x + c) % q
+        result = (lhs == rhs)
+    return result
+
+
+def test_ell_check_point():
+    b = -10
+    c = 21
+    q = 557
+    p = Ell_Pt(x=2, y=3)
+    pointOnCurve = ell_check_point(b, c, q, p)
+    assert (pointOnCurve == True)
+
+
 def ell_naive_multiply_point(b: int, c: int, q: int, p: Ell_Pt, k: int):
     # Performs k*p, which is actually just:
     # p+p+p+...+p  where p is added to itself k times
@@ -507,10 +574,10 @@ def ell_naive_multiply_point(b: int, c: int, q: int, p: Ell_Pt, k: int):
         if i == 0:
             outPt = p
         else:
-            outPt = ell_curve_add_points(b, c, q, outPt, p)
-        print(f"{p} * {i+1} = {outPt}")
+            outPt = ell_add_points(b, c, q, outPt, p)
+        # print(f"{p} * {i+1} = {outPt}")
 
-    print(f"final: {outPt}")
+    # print(f"final: {outPt}")
     return outPt
 
 # Fast Multiply Elliptic Point
@@ -524,16 +591,16 @@ def ell_fast_multiply_point(b: int, c: int, q: int, p: Ell_Pt, k: int):
     pt_values = [p]
     for i in range(1, greatestPower+1):
         lastPt = pt_values[i-1]
-        newPt = ell_curve_add_points(b, c, q, lastPt, lastPt)
+        newPt = ell_add_points(b, c, q, lastPt, lastPt)
         pt_values.append(newPt)
 
     outPt = pt_values[powerList[0]]
     for i in range(1, len(powerList)):
         addPt = pt_values[powerList[i]]
-        outPt = ell_curve_add_points(b, c, q, outPt, addPt)
+        outPt = ell_add_points(b, c, q, outPt, addPt)
 
-    #print(pt_values)
-    #print(outPt)
+    # print(pt_values)
+    # print(outPt)
     return outPt
 
 
@@ -550,6 +617,25 @@ def test_ell_multiply_point():
 
     assert (p3 == p4)
 
+    b = -10
+    c = 21
+    q = 557
+    p = Ell_Pt(x=2, y=3)
+    k = 189
+    p_189_f = ell_fast_multiply_point(b, c, q, p, k)
+    p_189_n = ell_naive_multiply_point(b, c, q, p, k)
+    assert (p_189_f == p_189_n)
+
+    k = 63
+    p_63_f = ell_fast_multiply_point(b, c, q, p, k)
+    p_63_n = ell_naive_multiply_point(b, c, q, p, k)
+    assert (p_63_f == p_63_n)
+
+    k = 27
+    p_27_f = ell_fast_multiply_point(b, c, q, p, k)
+    p_27_n = ell_naive_multiply_point(b, c, q, p, k)
+    assert (p_27_f == p_27_n)
+
 
 def test_ell_curve_add_points():
     # y^2 = x^3 + 4x + 4 mod 5
@@ -558,13 +644,12 @@ def test_ell_curve_add_points():
     q = 5
     p1 = Ell_Pt(x=1, y=2)
     p2 = Ell_Pt(x=4, y=3)
-    p3 = ell_curve_add_points(b, c, q, p1, p2)
+    p3 = ell_add_points(b, c, q, p1, p2)
     assert (p3 == Ell_Pt(x=4, y=2))
 
     p1 = Ell_Pt(x=1, y=2)
-    p3 = ell_curve_add_points(b, c, q, p1, p1)
+    p3 = ell_add_points(b, c, q, p1, p1)
     assert (p3 == Ell_Pt(x=2, y=0))
-
 
 
 def test_BabyGiant():
@@ -584,8 +669,8 @@ def test_BabyGiant():
 def test_inverse_mod():
     x = 8
     m = 19
-    inv_x = inverse_mod(x,m)
-    assert(inv_x * x % m == 1)
+    inv_x = inverse_mod(x, m)
+    assert (inv_x * x % m == 1)
     x = 12
     m = 19
     inv_x = inverse_mod(x, m)
@@ -594,6 +679,7 @@ def test_inverse_mod():
     m = 19
     inv_x = inverse_mod(x, m)
     assert (inv_x * x % m == 1)
+
 
 def test_gcd():
     a = 15
@@ -628,6 +714,8 @@ def test():
     test_Ell_Pt()
     test_ell_curve_add_points()
     test_ell_multiply_point()
+    test_ell_check_point()
+    test_ell_size_of_E_by_hasse()
 
 
 # Run the internal tests by running this script.
