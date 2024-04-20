@@ -6,11 +6,74 @@
 # Spring, 2024
 #
 # See comments for each function to see the source
+#
+#
+# Here's a congruence symbol for easy access: ≡
 
 from math import floor, ceil, sqrt
 import numpy as np
 from sympy import factorint
 from functools import reduce
+
+
+class Ell_Pt:
+    def __init__(self, x: int = None, y: int = None, isInf: bool = False) -> None:
+        # You can only send isInfo without specifying x,y
+        self.x = x
+        self.y = y
+        self.isInf = isInf
+
+        if (isInf == True):
+            assert (x == None and y == None)
+        if (isInf == False):
+            assert (x != None and y != None)
+
+    def __str__(self) -> str:
+        if self.isInf:
+            return "∞"
+        else:
+            return f"({self.x}, {self.y})"
+
+    # Have to do this for VSCode
+    def __repr__(self) -> str:
+        return str(self)
+
+    def __eq__(self, p: object) -> bool:
+        return (
+            (type(self) == type(p) and
+             self.isInf == p.isInf and
+             self.x == p.x and
+             self.y == p.y
+             )
+        )
+
+    # Pretty cheesy hash, I know. But it works.
+    def __hash__(self) -> int:
+        tupleRep = (self.x, self.y, self.isInf)
+        return hash(tupleRep)
+
+    def inverse(self) -> None:
+        if self.isInf:
+            return Ell_Pt(isInf=True)
+        else:
+            return Ell_Pt(x=self.x, y=-1*self.y)
+
+
+def test_Ell_Pt():
+    assert (Ell_Pt(x=1, y=4) == Ell_Pt(x=1, y=4))
+    assert (Ell_Pt(isInf=True) == Ell_Pt(isInf=True))
+    assert (Ell_Pt(x=1, y=4) != Ell_Pt(x=2, y=4))
+    assert (Ell_Pt(x=1, y=4) != Ell_Pt(isInf=True))
+    p = Ell_Pt(x=9, y=6)
+    assert (p.inverse() == Ell_Pt(x=9, y=-6))
+
+
+def test_Ell_Pt_InitFails():
+    # Both of the below should fail.
+    # Run them one at a time.
+    Ell_Pt(x=1, y=2, isInf=True)
+    Ell_Pt(isInf=False)
+
 
 # chinese_remainder and mul_inv were
 # lifted wholesale from
@@ -56,10 +119,19 @@ def test_crt():
         # print(f"{x} % {n[i]} = {a[i]}")
 
 
+def inverse_mod(x: int, m: int):
+    assert (m > 0)
+    # Make sure x is positive
+    x = x % m
+    (d, inv_m, inv_x) = gcd(m, x)
+    return (inv_x % m)
+
 # GCD implementation based on:
 #       The Extended Euclidean Algorithm
 #       Andreas Klappenecker
 #       August 25, 2006
+
+
 def gcd(inA: int, inB: int):
     # Make sure a is bigger than b
     assert inA >= inB
@@ -132,6 +204,17 @@ def decomposeIntoPowers(inVal: int, b: int):
     assert (n == inVal)
 
     return powerList
+
+
+def test_decomposeIntoPowers():
+    powerList = decomposeIntoPowers(38, 2)
+    assert (powerList == [5, 2, 1])
+    powerList = decomposeIntoPowers(100, 2)
+    assert (powerList == [6, 5, 2])
+    powerList = decomposeIntoPowers(103, 2)
+    assert (powerList == [6, 5, 2, 1, 0])
+    powerList = decomposeIntoPowers(101, 2)
+    assert (powerList == [6, 5, 2, 0])
 
 # Fast power up!
 
@@ -222,7 +305,7 @@ def generatorListAndInverses(a: int, p: int):
     return (g, g_inv, g_map)
 
 
-def testGeneratorListAndInverse():
+def test_GeneratorListAndInverse():
     a = 2
     p = 29
     g, g_inv, g_map = generatorListAndInverses(a, p)
@@ -336,7 +419,7 @@ def pohligHellman(p: int, a: int, b: int):
     return x
 
 
-def testPohligHellman():
+def test_PohligHellman():
     p = 29
     a = 2
     b = 18
@@ -359,13 +442,132 @@ def testPohligHellman():
     print(f"Pohlig-Hellman Solution for {a}^x ≡ {b} mod {p} is {x}")
     print(f"{a}^{x} % {p} = {b}")
 
-def test():
-    test_crt()
-    testGeneratorListAndInverse()
-    testPohligHellman()
+
+# Elliptic Curves!
+#
+#  ell_curve_add_points takes the description of an elliptic curve
+#  of the form:
+#  y^2 ≡ x^3 + b*x + c mod q
+#
+#  So the curve is really defined by the parameters b, c, and q
+#  q should be prime
+def ell_curve_add_points(b: int, c: int, q: int, p1: Ell_Pt, p2: Ell_Pt):
+    # Handle adding infinity:
+    if (p1.isInf):
+        return p2
+    if (p2.isInf):
+        return p1
+
+    x1 = p1.x
+    y1 = p1.y
+    x2 = p2.x
+    y2 = p2.y
+
+    # Determine m
+    # Recall there are two possibilities:
+    if (p1 == p2):
+        # Special Case for y=0, which would mean 
+        # 0 in the denominator for m.
+        if y1 == 0:
+            return Ell_Pt(isInf=True)
+
+        # Case where we are adding a point to itself
+        numerator = (3 * (x1**2) + b) % q
+        denominator = 2*y1
+        inverse_denom = inverse_mod(denominator, q)
+        m = numerator * inverse_denom % q
+    else:
+        # Case where p1 != p2
+        #
+        # Special case is when x1 == x2, in which case
+        # the points sum to infinity
+        if (x1 == x2):
+            return Ell_Pt(isInf=True)
+
+        # m = (y2-y1)/(x2-x1)
+        # But recall we're in mod q so really this is:
+        # (y2-y1) * ( inverse of (x2-x1) in mod q )
+        delta_y = y2 - y1
+        delta_x = x2 - x1
+        inv_delta_x = inverse_mod(delta_x, q)
+        m = (delta_y * inv_delta_x) % q
+
+    x3 = (m**2 - x1 - x2) % q
+    y3 = (m * (x1 - x3) - y1) % q
+
+    return Ell_Pt(x=x3, y=y3)
 
 
-def testBabyGiant():
+def ell_naive_multiply_point(b: int, c: int, q: int, p: Ell_Pt, k: int):
+    # Performs k*p, which is actually just:
+    # p+p+p+...+p  where p is added to itself k times
+    assert (k > 0)
+    outPt = None
+    for i in range(0, k):
+        if i == 0:
+            outPt = p
+        else:
+            outPt = ell_curve_add_points(b, c, q, outPt, p)
+        print(f"{p} * {i+1} = {outPt}")
+
+    print(f"final: {outPt}")
+    return outPt
+
+# Fast Multiply Elliptic Point
+
+
+def ell_fast_multiply_point(b: int, c: int, q: int, p: Ell_Pt, k: int):
+    # Does repeated point addition FAST
+    assert (k > 0)
+    powerList = decomposeIntoPowers(k, 2)
+    greatestPower = powerList[0]
+    pt_values = [p]
+    for i in range(1, greatestPower+1):
+        lastPt = pt_values[i-1]
+        newPt = ell_curve_add_points(b, c, q, lastPt, lastPt)
+        pt_values.append(newPt)
+
+    outPt = pt_values[powerList[0]]
+    for i in range(1, len(powerList)):
+        addPt = pt_values[powerList[i]]
+        outPt = ell_curve_add_points(b, c, q, outPt, addPt)
+
+    #print(pt_values)
+    #print(outPt)
+    return outPt
+
+
+def test_ell_multiply_point():
+    # y^2 = x^3 + 4x + 4 mod 5
+    b = 4
+    c = 4
+    q = 5
+    p1 = Ell_Pt(x=1, y=2)
+    k = 150
+
+    p3 = ell_naive_multiply_point(b, c, q, p1, k)
+    p4 = ell_fast_multiply_point(b, c, q, p1, k)
+
+    assert (p3 == p4)
+
+
+def test_ell_curve_add_points():
+    # y^2 = x^3 + 4x + 4 mod 5
+    b = 4
+    c = 4
+    q = 5
+    p1 = Ell_Pt(x=1, y=2)
+    p2 = Ell_Pt(x=4, y=3)
+    p3 = ell_curve_add_points(b, c, q, p1, p2)
+    assert (p3 == Ell_Pt(x=4, y=2))
+
+    p1 = Ell_Pt(x=1, y=2)
+    p3 = ell_curve_add_points(b, c, q, p1, p1)
+    assert (p3 == Ell_Pt(x=2, y=0))
+
+
+
+def test_BabyGiant():
     # Problem: 2^x congruent to 9 mod 11
     #          a^x congruent to b mod p
     a = 2
@@ -379,7 +581,21 @@ def testBabyGiant():
         assert (b == testVal)
 
 
-def testgcd():
+def test_inverse_mod():
+    x = 8
+    m = 19
+    inv_x = inverse_mod(x,m)
+    assert(inv_x * x % m == 1)
+    x = 12
+    m = 19
+    inv_x = inverse_mod(x, m)
+    assert (inv_x * x % m == 1)
+    x = 10
+    m = 19
+    inv_x = inverse_mod(x, m)
+    assert (inv_x * x % m == 1)
+
+def test_gcd():
     a = 15
     b = 6
     (g, r, s) = gcd(a, b)
@@ -398,4 +614,22 @@ def testgcd():
     d = a*r+b*s
     assert g == d
 
-    print("testGCD Complete")
+    print("test_GCD Complete")
+
+
+def test():
+    test_inverse_mod()
+    test_gcd()
+    test_decomposeIntoPowers()
+    test_crt()
+    test_BabyGiant()
+    test_GeneratorListAndInverse()
+    test_PohligHellman()
+    test_Ell_Pt()
+    test_ell_curve_add_points()
+    test_ell_multiply_point()
+
+
+# Run the internal tests by running this script.
+if __name__ == "__main__":
+    test()
